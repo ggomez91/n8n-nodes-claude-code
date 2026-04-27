@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claudenode.local/contracts/error-payload.schema.json",
+  "title": "Claude Node Error Payload",
+  "description": "Shape attached to a NodeOperationError (whole-execution failure) or emitted in the failure bucket when 'Continue on Fail' is enabled. Six discrete categories cover every failure mode in the spec; the 'details' shape varies by category.",
+  "type": "object",
+  "required": ["success", "category", "message", "details", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "success": { "const": false },
+    "category": {
+      "enum": [
+        "validation",
+        "not-found",
+        "exit-failure",
+        "parse-failure",
+        "timeout",
+        "cancelled"
+      ],
+      "description": "Fixed enumeration. Downstream nodes can branch reliably on this field; new categories require a MAJOR node version bump."
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single-sentence human-readable summary suitable for display in n8n's execution log."
+    },
+    "details": {
+      "type": "object",
+      "description": "Category-specific diagnostic fields. The discriminator is 'category' on the parent object.",
+      "additionalProperties": true
+    },
+    "meta": {
+      "type": "object",
+      "required": ["itemIndex"],
+      "additionalProperties": false,
+      "properties": {
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wall-clock milliseconds from spawn() to failure. Omitted when the failure occurred before spawn (e.g., validation)."
+        },
+        "itemIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index of the input item that produced the failure."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "category": { "const": "validation" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["parameter"],
+            "properties": {
+              "parameter": { "type": "string" },
+              "received": { "description": "Truncated/redacted representation of the offending value." }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "category": { "const": "not-found" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["binaryName"],
+            "properties": {
+              "binaryName": { "type": "string" },
+              "pathHint": { "type": "string", "description": "Value of PATH at lookup time, included so authors can diagnose missing entries." }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "category": { "const": "exit-failure" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["exitCode"],
+            "properties": {
+              "exitCode": { "type": "integer" },
+              "stderrExcerpt": { "type": "string", "description": "Last ≤4 KiB of stderr." }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "category": { "const": "parse-failure" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["parseError"],
+            "properties": {
+              "parseError": { "type": "string" },
+              "stdoutExcerpt": { "type": "string", "description": "First ≤2 KiB of the offending stdout." }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "category": { "const": "timeout" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["timeoutSeconds"],
+            "properties": {
+              "timeoutSeconds": { "type": "integer", "minimum": 1 },
+              "signalEscalatedTo": {
+                "description": "'SIGKILL' if SIGTERM was insufficient to terminate the subprocess within the 5-second grace window; null otherwise.",
+                "anyOf": [
+                  { "type": "string", "const": "SIGKILL" },
+                  { "type": "null" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "category": { "const": "cancelled" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
+}

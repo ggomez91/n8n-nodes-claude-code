@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claudenode.local/contracts/node-output.schema.json",
+  "title": "Claude Node Output Item",
+  "description": "Shape of a single n8n output item emitted by the Claude node on success. Top-level additionalProperties are permitted so additive fields from the CLI surface without a node release (Constitution Principle II).",
+  "type": "object",
+  "required": ["success", "response", "raw", "meta"],
+  "additionalProperties": true,
+  "properties": {
+    "success": {
+      "const": true,
+      "description": "Always true for items in the success bucket. Downstream IF nodes can branch on this single field for success/failure routing."
+    },
+    "response": {
+      "type": "string",
+      "description": "The text content of Claude's response, extracted from the CLI's structured output. This is the field workflow authors will most often consume."
+    },
+    "model": {
+      "type": "string",
+      "description": "The model identifier the CLI reports it used. Optional because the CLI may not always include it (older versions, error fallbacks)."
+    },
+    "stopReason": {
+      "type": "string",
+      "description": "Why generation stopped. Examples: 'end_turn', 'max_tokens', 'stop_sequence'. Optional for the same reason as 'model'."
+    },
+    "usage": {
+      "type": "object",
+      "description": "Token-count metadata when the CLI provides it.",
+      "additionalProperties": true,
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "raw": {
+      "type": "object",
+      "description": "The full unparsed JSON object emitted by the CLI on stdout. Pass-through so downstream nodes can read fields the node has not promoted to top-level.",
+      "additionalProperties": true
+    },
+    "meta": {
+      "type": "object",
+      "description": "Node-side observability metadata. Distinguishes node-attributed timing from CLI-attributed metadata.",
+      "required": ["elapsedMs"],
+      "additionalProperties": false,
+      "properties": {
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wall-clock milliseconds from spawn() to subprocess exit, measured by the node."
+        }
+      }
+    }
+  }
+}

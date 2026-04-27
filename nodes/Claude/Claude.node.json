@@ -1,0 +1,13 @@
+{
+  "node": "@ggomez91/n8n-nodes-claude-code.claude",
+  "nodeVersion": "0.6.0",
+  "codexVersion": "1.0",
+  "categories": ["AI"],
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://github.com/ggomez91/n8n-nodes-claude-code#readme"
+      }
+    ]
+  }
+}

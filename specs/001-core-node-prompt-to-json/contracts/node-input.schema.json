@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claudenode.local/contracts/node-input.schema.json",
+  "title": "Claude Node Input Parameters",
+  "description": "Resolved per-item input to the Claude n8n node, after n8n expression evaluation. This is the contract the runtime layer (subprocess.runner.ts) consumes; it is not the n8n INodeProperties declaration itself.",
+  "type": "object",
+  "required": ["prompt", "timeoutSeconds", "cliBinaryName", "itemIndex"],
+  "additionalProperties": false,
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The text prompt to send to Claude. MUST be a non-empty string after trim. n8n expressions yielding non-string values are coerced via String() upstream of this contract."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1800,
+      "default": 120,
+      "description": "Wall-clock timeout for the CLI subprocess. On expiry, SIGTERM is sent; if the process does not exit within 5 seconds, SIGKILL is sent."
+    },
+    "cliBinaryName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "default": "claude",
+      "description": "Name of the CLI binary to spawn. Resolved against PATH by the OS. The pattern restricts characters to defend against the override field itself becoming an injection vector."
+    },
+    "itemIndex": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based index of the input item being processed. Used for per-item error attribution; supplied by n8n's runtime."
+    }
+  }
+}
