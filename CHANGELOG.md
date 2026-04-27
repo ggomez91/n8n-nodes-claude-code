@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-04-26
+
+### Added
+
+- **`Binary Properties` parameter** (top-level, optional). Comma- or
+  space-separated list of n8n binary property names to attach as files
+  for this invocation. Each binary buffer is staged into a unique
+  per-invocation temp directory; the directory path is passed to the
+  CLI via `--add-dir` so Claude Code's Read tool can access the files
+  (including images for vision). The temp directory is cleaned up after
+  the call (success, failure, or cancellation).
+- Auto-prepended hint to the system prompt when attachments are present:
+  Claude is told the directory and filenames so it knows what's
+  available without the user listing them by hand.
+- Cache key now includes a SHA-256 digest of the attachments. Different
+  binary content produces different cache entries; identical content
+  hits the cache.
+
+### Limits
+
+- Max 16 attachments per invocation, 50 MiB per file.
+- Filenames are sanitized (path components stripped, shell-special chars
+  replaced with `_`); duplicates get `-2`, `-3`, … suffixes.
+
+### Use case
+
+Drop a "Read Binary File" or HTTP-Request node before the Claude node
+to fetch an image, set Binary Properties to `data`, and prompt Claude
+to describe / extract / summarize it. Useful for vision workflows
+(yesterday's newsletter screenshot → today's draft, chart → analysis,
+etc.).
+
 ## [0.6.0] — 2026-04-26
 
 ### Changed

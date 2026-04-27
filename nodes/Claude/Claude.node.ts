@@ -1,9 +1,10 @@
-import type {
-  IDataObject,
-  IExecuteFunctions,
-  INodeExecutionData,
-  INodeType,
-  INodeTypeDescription,
+import {
+  ApplicationError,
+  type IDataObject,
+  type IExecuteFunctions,
+  type INodeExecutionData,
+  type INodeType,
+  type INodeTypeDescription,
 } from 'n8n-workflow';
 
 import { nodeProperties, validateAndNormalize, ValidationFailure } from './lib/parameters';
@@ -19,7 +20,20 @@ import {
   readCache,
   writeCache,
 } from './lib/cache';
-import type { ErrorPayload, JsonOutcome, NodeOutputItem, ResponseFormat } from './lib/types';
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_COUNT,
+  attachmentsDigest,
+  parseBinaryPropertyNames,
+  stageAttachments,
+} from './lib/attachments';
+import type {
+  BinaryAttachment,
+  ErrorPayload,
+  JsonOutcome,
+  NodeOutputItem,
+  ResponseFormat,
+} from './lib/types';
 
 export class Claude implements INodeType {
   description: INodeTypeDescription = {
@@ -70,6 +84,7 @@ async function runForItem(
   const rawPrompt = ctx.getNodeParameter('prompt', i, '');
   const timeoutSeconds = ctx.getNodeParameter('timeoutSeconds', i, 120) as number;
   const model = ctx.getNodeParameter('model', i, '') as string;
+  const binaryProperties = ctx.getNodeParameter('binaryProperties', i, '') as string;
   const systemPrompt = ctx.getNodeParameter('systemPrompt', i, '') as string;
   const rawFormat = ctx.getNodeParameter('responseFormat', i, 'raw');
   const responseFormat: ResponseFormat = rawFormat === 'json' ? 'json' : 'raw';
@@ -110,6 +125,25 @@ async function runForItem(
     throw err;
   }
 
+  // Resolve binary attachments from the input item, if any.
+  let attachments: BinaryAttachment[] = [];
+  try {
+    attachments = await resolveAttachments(ctx, i, binaryProperties);
+  } catch (err) {
+    return {
+      kind: 'error',
+      error: mapToError(
+        'validation',
+        {
+          parameter: 'binaryProperties',
+          received: err instanceof Error ? err.message : String(err),
+        },
+        { itemIndex: i },
+      ),
+    };
+  }
+
+  const aDigest = attachmentsDigest(attachments);
   const ckey = useCache
     ? cacheKey({
         prompt: input.prompt,
@@ -117,6 +151,7 @@ async function runForItem(
         systemPrompt: input.systemPrompt,
         responseFormat,
         cliBinaryName: input.cliBinaryName,
+        attachmentsDigest: aDigest,
       })
     : null;
 
@@ -128,39 +163,90 @@ async function runForItem(
     }
   }
 
-  if (responseFormat === 'raw') {
-    const result = await runCli(input, { cancelSignal });
-    const payload = mapResultToPayload(result, i);
-    maybeCache(payload, ckey, cacheDir);
-    return payload;
+  // Stage attachments to a temp dir; cleanup is mandatory in the finally block.
+  const staged = attachments.length > 0 ? stageAttachments(attachments) : null;
+  const runOpts = { cancelSignal, attachmentsDir: staged?.dir };
+  // Auto-prepend a hint about available files so Claude knows what to Read.
+  if (staged) {
+    const hint = `Files staged for this request in ${staged.dir}: ${staged.fileNames.join(', ')}. Use the Read tool on any of them as needed.`;
+    input = { ...input, systemPrompt: input.systemPrompt ? `${input.systemPrompt}\n\n${hint}` : hint };
   }
 
-  // JSON mode: fail-soft. Always emit a successful item; signal parse status via `json` field.
-  const maxAttempts = retries + 1;
-  let lastSuccessPayload: { kind: 'item'; item: NodeOutputItem } | null = null;
-  let lastJsonError = '';
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const result = await runCli(input, { cancelSignal });
-    const payload = mapResultToPayload(result, i);
-
-    if (payload.kind === 'error') return payload; // CLI-level failure: still hard-fails
-
-    const parse = tryParseJson(payload.item.response);
-    if (parse.ok) {
-      payload.item.json = { ok: true, value: parse.value, attempts: attempt };
+  try {
+    if (responseFormat === 'raw') {
+      const result = await runCli(input, runOpts);
+      const payload = mapResultToPayload(result, i);
       maybeCache(payload, ckey, cacheDir);
       return payload;
     }
 
-    lastSuccessPayload = payload;
-    lastJsonError = parse.error;
+    // JSON mode: fail-soft. Always emit a successful item; signal parse status via `json` field.
+    const maxAttempts = retries + 1;
+    let lastSuccessPayload: { kind: 'item'; item: NodeOutputItem } | null = null;
+    let lastJsonError = '';
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await runCli(input, runOpts);
+      const payload = mapResultToPayload(result, i);
+
+      if (payload.kind === 'error') return payload; // CLI-level failure: still hard-fails
+
+      const parse = tryParseJson(payload.item.response);
+      if (parse.ok) {
+        payload.item.json = { ok: true, value: parse.value, attempts: attempt };
+        maybeCache(payload, ckey, cacheDir);
+        return payload;
+      }
+
+      lastSuccessPayload = payload;
+      lastJsonError = parse.error;
+    }
+
+    const jsonFailure: JsonOutcome = { ok: false, error: lastJsonError, attempts: maxAttempts };
+    lastSuccessPayload!.item.json = jsonFailure;
+    // Not cached — failures aren't cache-worthy.
+    return lastSuccessPayload!;
+  } finally {
+    staged?.cleanup();
+  }
+}
+
+async function resolveAttachments(
+  ctx: IExecuteFunctions,
+  itemIndex: number,
+  binaryPropertiesParam: string,
+): Promise<BinaryAttachment[]> {
+  const propNames = parseBinaryPropertyNames(binaryPropertiesParam);
+  if (propNames.length === 0) return [];
+  if (propNames.length > MAX_ATTACHMENT_COUNT) {
+    throw new ApplicationError(`Too many binary attachments: ${propNames.length} (max ${MAX_ATTACHMENT_COUNT})`);
   }
 
-  const jsonFailure: JsonOutcome = { ok: false, error: lastJsonError, attempts: maxAttempts };
-  lastSuccessPayload!.item.json = jsonFailure;
-  // Not cached — failures aren't cache-worthy.
-  return lastSuccessPayload!;
+  const items = ctx.getInputData();
+  const item = items[itemIndex];
+  const binary = item?.binary ?? {};
+
+  const out: BinaryAttachment[] = [];
+  let totalBytes = 0;
+  for (const name of propNames) {
+    const meta = binary[name];
+    if (!meta) {
+      throw new ApplicationError(`Input item has no binary property named "${name}"`);
+    }
+    const buffer = await ctx.helpers.getBinaryDataBuffer(itemIndex, name);
+    totalBytes += buffer.length;
+    if (buffer.length > MAX_ATTACHMENT_BYTES) {
+      throw new ApplicationError(
+        `Binary "${name}" is ${buffer.length} bytes; exceeds per-file limit ${MAX_ATTACHMENT_BYTES}`,
+      );
+    }
+    out.push({ fileName: meta.fileName ?? '', buffer, mimeType: meta.mimeType });
+  }
+
+  if (totalBytes > MAX_ATTACHMENT_BYTES * MAX_ATTACHMENT_COUNT) {
+    throw new ApplicationError(`Total attachment size exceeds the cap`);
+  }
+  return out;
 }
 
 function maybeCache(payload: MapResult, key: string | null, dir: string): void {

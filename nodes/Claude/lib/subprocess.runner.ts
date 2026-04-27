@@ -6,6 +6,8 @@ const SIGKILL_GRACE_MS = 5_000;
 
 export interface RunOptions {
   cancelSignal?: AbortSignal;
+  /** Absolute path to a directory containing staged binary attachments. Adds --add-dir. */
+  attachmentsDir?: string;
 }
 
 export async function runCli(
@@ -15,6 +17,7 @@ export async function runCli(
   const start = Date.now();
   const args = ['-p', '--output-format', 'json'];
   if (input.model) args.push('--model', input.model);
+  if (opts.attachmentsDir) args.push('--add-dir', opts.attachmentsDir);
   if (input.systemPrompt) args.push('--append-system-prompt', input.systemPrompt);
   args.push(input.prompt);
 

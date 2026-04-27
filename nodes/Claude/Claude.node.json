@@ -1,6 +1,6 @@
 {
   "node": "@ggomez91/n8n-nodes-claude-code.claude",
-  "nodeVersion": "0.6.0",
+  "nodeVersion": "0.7.0",
   "codexVersion": "1.0",
   "categories": ["AI"],
   "resources": {

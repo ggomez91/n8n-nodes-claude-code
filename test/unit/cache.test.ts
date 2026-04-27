@@ -27,6 +27,7 @@ describe('cacheKey', () => {
     systemPrompt: undefined,
     responseFormat: 'raw' as const,
     cliBinaryName: 'claude',
+    attachmentsDigest: '',
   };
 
   it('produces a 64-char hex hash', () => {
@@ -72,6 +73,13 @@ describe('cacheKey', () => {
   it('treats undefined systemPrompt and empty as equivalent', () => {
     expect(cacheKey({ ...base, systemPrompt: undefined })).toBe(
       cacheKey({ ...base, systemPrompt: '' }),
+    );
+  });
+
+  it('changes when attachmentsDigest changes', () => {
+    expect(cacheKey(base)).not.toBe(cacheKey({ ...base, attachmentsDigest: 'a'.repeat(64) }));
+    expect(cacheKey({ ...base, attachmentsDigest: 'a'.repeat(64) })).not.toBe(
+      cacheKey({ ...base, attachmentsDigest: 'b'.repeat(64) }),
     );
   });
 });

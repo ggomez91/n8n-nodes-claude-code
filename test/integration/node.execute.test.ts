@@ -1,13 +1,20 @@
 import * as path from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import type { IDataObject, IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { Claude } from '../../nodes/Claude/Claude.node';
 
 const FIXTURES = path.resolve(__dirname, '..', 'fixtures');
 
+interface MockBinary {
+  fileName: string;
+  data: Buffer;
+  mimeType?: string;
+}
+
 interface MockOptions {
   inputItems?: Array<Record<string, unknown>>;
+  inputBinaries?: Array<Record<string, MockBinary>>;
   prompts?: string[];
   timeoutSeconds?: number;
   cliBinaryName?: string;
@@ -16,15 +23,29 @@ interface MockOptions {
   retries?: number;
   model?: string;
   systemPrompt?: string;
+  binaryProperties?: string;
   useCache?: boolean;
   cacheTtlSeconds?: number;
   cacheDir?: string;
 }
 
 function makeExecuteContext(opts: MockOptions): IExecuteFunctions {
-  const items: INodeExecutionData[] = (opts.inputItems ?? [{}]).map((j) => ({
-    json: j as IDataObject,
-  }));
+  const baseItems = opts.inputItems ?? [{}];
+  const items: INodeExecutionData[] = baseItems.map((j, idx) => {
+    const item: INodeExecutionData = { json: j as IDataObject };
+    const binMap = opts.inputBinaries?.[idx];
+    if (binMap) {
+      item.binary = {} as INodeExecutionData['binary'];
+      for (const [name, b] of Object.entries(binMap)) {
+        (item.binary as Record<string, unknown>)[name] = {
+          fileName: b.fileName,
+          mimeType: b.mimeType ?? 'application/octet-stream',
+          data: b.data.toString('base64'),
+        };
+      }
+    }
+    return item;
+  });
   const prompts = opts.prompts ?? items.map(() => 'hello');
   const timeout = opts.timeoutSeconds ?? 5;
   const binary = opts.cliBinaryName ?? path.join(FIXTURES, 'claude-stub-success.sh');
@@ -42,6 +63,8 @@ function makeExecuteContext(opts: MockOptions): IExecuteFunctions {
           return opts.model ?? fallback ?? '';
         case 'systemPrompt':
           return opts.systemPrompt ?? fallback ?? '';
+        case 'binaryProperties':
+          return opts.binaryProperties ?? fallback ?? '';
         case 'responseFormat':
           return opts.responseFormat ?? fallback ?? 'raw';
         case 'options':
@@ -59,7 +82,13 @@ function makeExecuteContext(opts: MockOptions): IExecuteFunctions {
     continueOnFail: () => continueOnFail,
     getNode: () => ({ name: 'Claude', type: 'claude', typeVersion: 1, position: [0, 0] }) as any,
     getExecutionCancelSignal: () => undefined,
-    helpers: {} as any,
+    helpers: {
+      getBinaryDataBuffer: async (itemIndex: number, propertyName: string): Promise<Buffer> => {
+        const meta = (items[itemIndex]?.binary as Record<string, { data: string }>)?.[propertyName];
+        if (!meta) throw new Error(`No binary "${propertyName}" on item ${itemIndex}`);
+        return Buffer.from(meta.data, 'base64');
+      },
+    } as any,
   } as unknown as IExecuteFunctions;
 }
 
@@ -329,6 +358,86 @@ describe('Claude node — model parameter', () => {
     });
     const out = await node.execute.call(ctx);
     expect(out[0][0].json.success).toBe(true);
+  });
+});
+
+describe('Claude node — binary attachments (0.7.0)', () => {
+  const node = new Claude();
+
+  it('stages binary properties to a temp dir, passes --add-dir, and Claude can list them', async () => {
+    const ctx = makeExecuteContext({
+      cliBinaryName: path.join(FIXTURES, 'claude-stub-add-dir.sh'),
+      inputItems: [{}],
+      inputBinaries: [
+        {
+          screenshot: { fileName: 'shot.png', data: Buffer.from('PNG-bytes') },
+          report: { fileName: 'q4-report.pdf', data: Buffer.from('PDF-bytes') },
+        },
+      ],
+      binaryProperties: 'screenshot, report',
+      prompts: ['describe the files'],
+    });
+    const out = await node.execute.call(ctx);
+    const item = out[0][0].json as any;
+    expect(item.success).toBe(true);
+    // The stub echoes the --add-dir directory and lists its contents.
+    expect(item.raw.add_dir).toMatch(/n8n-nodes-claude-code-/);
+    expect(item.raw.files.sort()).toEqual(['q4-report.pdf', 'shot.png']);
+  });
+
+  it('cleans up the temp dir after execution (no leak)', async () => {
+    const ctx = makeExecuteContext({
+      cliBinaryName: path.join(FIXTURES, 'claude-stub-add-dir.sh'),
+      inputItems: [{}],
+      inputBinaries: [{ photo: { fileName: 'a.png', data: Buffer.from('a') } }],
+      binaryProperties: 'photo',
+    });
+    const out = await node.execute.call(ctx);
+    const stagedDir = (out[0][0].json as any).raw.add_dir as string;
+    expect(stagedDir).toBeTruthy();
+    expect(existsSync(stagedDir)).toBe(false);
+  });
+
+  it('fails with validation error when a named binary is missing', async () => {
+    const ctx = makeExecuteContext({
+      cliBinaryName: path.join(FIXTURES, 'claude-stub-success.sh'),
+      inputItems: [{}],
+      inputBinaries: [{}],
+      binaryProperties: 'missing_prop',
+      continueOnFail: true,
+    });
+    const out = await node.execute.call(ctx);
+    const item = out[0][0].json as any;
+    expect(item.success).toBe(false);
+    expect(item.category).toBe('validation');
+    expect(item.details.parameter).toBe('binaryProperties');
+  });
+
+  it('cache key incorporates binary content (different bytes → different key)', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'claudenode-attach-cache-'));
+    try {
+      const mk = (bytes: string) =>
+        makeExecuteContext({
+          cliBinaryName: path.join(FIXTURES, 'claude-stub-add-dir.sh'),
+          inputItems: [{}],
+          inputBinaries: [{ data: { fileName: 'in.bin', data: Buffer.from(bytes) } }],
+          binaryProperties: 'data',
+          useCache: true,
+          cacheDir: dir,
+          prompts: ['same prompt'],
+        });
+      // First call with bytes "alpha" — cache miss.
+      const out1 = await node.execute.call(mk('alpha'));
+      expect((out1[0][0].json as any).meta.cacheHit).toBeUndefined();
+      // Same prompt but different bytes — must miss (different attachments digest).
+      const out2 = await node.execute.call(mk('beta'));
+      expect((out2[0][0].json as any).meta.cacheHit).toBeUndefined();
+      // Same prompt + same bytes — must hit.
+      const out3 = await node.execute.call(mk('alpha'));
+      expect((out3[0][0].json as any).meta.cacheHit).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

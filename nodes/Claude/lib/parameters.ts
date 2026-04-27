@@ -30,6 +30,15 @@ export const nodeProperties: INodeProperties[] = [
       "The Claude model to use. Leave empty to use the CLI's default. Accepts an alias (opus, sonnet, haiku) or a full model ID (e.g. claude-sonnet-4-6). New models added by Anthropic are usable immediately as soon as the local CLI supports them.",
   },
   {
+    displayName: 'Binary Properties',
+    name: 'binaryProperties',
+    type: 'string',
+    default: '',
+    placeholder: 'data, attachment1, screenshot',
+    description:
+      "Comma-separated list of binary property names on the input item to attach as files. Each is staged into a temp directory passed via --add-dir, so Claude Code can Read them (including images for vision). The temp dir is deleted after the call. Leave empty for text-only invocations.",
+  },
+  {
     displayName: 'System Prompt',
     name: 'systemPrompt',
     type: 'string',

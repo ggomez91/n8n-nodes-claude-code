@@ -19,6 +19,19 @@ export interface NodeInputItem {
   model?: string;
   systemPrompt?: string;
   itemIndex: number;
+  /**
+   * Resolved binary attachments. Each entry is a buffer + a sanitized
+   * filename. The runner writes them to a per-invocation temp dir and
+   * adds --add-dir <tempdir> to argv. The Claude.node execute loop is
+   * responsible for cleanup.
+   */
+  attachments?: BinaryAttachment[];
+}
+
+export interface BinaryAttachment {
+  fileName: string;
+  buffer: Buffer;
+  mimeType?: string;
 }
 
 export type TerminationReason = 'exited' | 'timeout' | 'cancelled' | 'spawn-error';
