@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-04-26
+
+### Fixed
+
+- **Vision/PDF detection**: when n8n's binary metadata didn't include a
+  `fileName`, the staged file got `attachment-N.bin` and Claude Code's
+  Read tool fell back to raw-binary handling instead of vision. Now we
+  derive a proper extension from `mimeType` (e.g. `image/jpeg` → `.jpg`)
+  or n8n's `fileExtension` hint when the supplied filename has none.
+  Symptom previously reported: Claude responded "the file was returned
+  as raw binary data without a recognized image extension".
+
 ## [0.7.0] — 2026-04-26
 
 ### Added

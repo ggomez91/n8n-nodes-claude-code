@@ -25,6 +25,7 @@ import {
   MAX_ATTACHMENT_COUNT,
   attachmentsDigest,
   parseBinaryPropertyNames,
+  pickFileName,
   stageAttachments,
 } from './lib/attachments';
 import type {
@@ -240,7 +241,11 @@ async function resolveAttachments(
         `Binary "${name}" is ${buffer.length} bytes; exceeds per-file limit ${MAX_ATTACHMENT_BYTES}`,
       );
     }
-    out.push({ fileName: meta.fileName ?? '', buffer, mimeType: meta.mimeType });
+    out.push({
+      fileName: pickFileName(meta as any, name),
+      buffer,
+      mimeType: meta.mimeType,
+    });
   }
 
   if (totalBytes > MAX_ATTACHMENT_BYTES * MAX_ATTACHMENT_COUNT) {

@@ -10,6 +10,65 @@ export const MAX_ATTACHMENT_COUNT = 16;
 
 const SAFE_FILENAME_CHARS = /[^A-Za-z0-9._-]+/g;
 
+// Common MIME → extension mappings. Kept short and curated for the file types
+// Claude Code's Read tool actually does something useful with (vision for
+// images, text for documents). PDFs are also Read-able.
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/svg+xml': 'svg',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'text/markdown': 'md',
+  'text/html': 'html',
+  'text/csv': 'csv',
+  'application/json': 'json',
+  'application/xml': 'xml',
+  'text/xml': 'xml',
+};
+
+/** Best-effort extension for a MIME type. Empty string if unknown. */
+export function extensionForMime(mimeType: string | undefined): string {
+  if (!mimeType) return '';
+  return MIME_TO_EXT[mimeType.toLowerCase().split(';')[0].trim()] ?? '';
+}
+
+function hasExtension(name: string): boolean {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1;
+}
+
+/**
+ * Build the most-helpful filename for a staged attachment, in priority order:
+ *   1. The user-supplied fileName, if it already has an extension.
+ *   2. The user-supplied fileName + extension derived from MIME, if available.
+ *   3. The n8n fileExtension hint applied to the property name.
+ *   4. The MIME-derived extension applied to the property name.
+ *   5. Fallback `<propName>.bin`.
+ *
+ * The result is run through sanitizeFileName before staging.
+ */
+export function pickFileName(
+  meta: { fileName?: string; fileExtension?: string; mimeType?: string },
+  propName: string,
+): string {
+  const ext =
+    (meta.fileExtension && meta.fileExtension.replace(/^\./, '')) ||
+    extensionForMime(meta.mimeType);
+
+  if (meta.fileName) {
+    if (hasExtension(meta.fileName)) return meta.fileName;
+    if (ext) return `${meta.fileName}.${ext}`;
+    return meta.fileName;
+  }
+  if (ext) return `${propName}.${ext}`;
+  return `${propName}.bin`;
+}
+
 /** Parse the Binary Properties parameter (comma/space separated) into a clean list. */
 export function parseBinaryPropertyNames(raw: string): string[] {
   return raw

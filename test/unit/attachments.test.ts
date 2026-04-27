@@ -2,7 +2,9 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 import {
   attachmentsDigest,
+  extensionForMime,
   parseBinaryPropertyNames,
+  pickFileName,
   sanitizeFileName,
   stageAttachments,
 } from '../../nodes/Claude/lib/attachments';
@@ -81,6 +83,59 @@ describe('attachmentsDigest', () => {
     const x = { fileName: 'x.png', buffer: Buffer.from('x') };
     const y = { fileName: 'y.png', buffer: Buffer.from('y') };
     expect(attachmentsDigest([x, y])).not.toBe(attachmentsDigest([y, x]));
+  });
+});
+
+describe('extensionForMime', () => {
+  it('maps common image MIME types', () => {
+    expect(extensionForMime('image/jpeg')).toBe('jpg');
+    expect(extensionForMime('image/png')).toBe('png');
+    expect(extensionForMime('image/webp')).toBe('webp');
+  });
+
+  it('handles MIME parameters and casing', () => {
+    expect(extensionForMime('IMAGE/JPEG')).toBe('jpg');
+    expect(extensionForMime('image/jpeg; charset=utf-8')).toBe('jpg');
+    expect(extensionForMime('  image/png ; foo=bar')).toBe('png');
+  });
+
+  it('returns empty for unknown MIME or undefined', () => {
+    expect(extensionForMime(undefined)).toBe('');
+    expect(extensionForMime('application/octet-stream')).toBe('');
+    expect(extensionForMime('not-a-mime')).toBe('');
+  });
+});
+
+describe('pickFileName', () => {
+  it('keeps a fileName that already has an extension', () => {
+    expect(pickFileName({ fileName: 'photo.jpg', mimeType: 'image/jpeg' }, 'data')).toBe('photo.jpg');
+  });
+
+  it('appends an extension derived from MIME when fileName has none', () => {
+    expect(pickFileName({ fileName: 'photo', mimeType: 'image/jpeg' }, 'data')).toBe('photo.jpg');
+  });
+
+  it('uses fileExtension hint over MIME', () => {
+    expect(
+      pickFileName({ fileName: 'photo', fileExtension: 'png', mimeType: 'image/jpeg' }, 'data'),
+    ).toBe('photo.png');
+  });
+
+  it('strips leading dot from fileExtension', () => {
+    expect(pickFileName({ fileName: 'photo', fileExtension: '.png' }, 'data')).toBe('photo.png');
+  });
+
+  it('falls back to <propName>.<ext> when fileName is missing', () => {
+    expect(pickFileName({ mimeType: 'image/png' }, 'screenshot')).toBe('screenshot.png');
+  });
+
+  it('falls back to <propName>.bin when nothing is known', () => {
+    expect(pickFileName({}, 'mystery')).toBe('mystery.bin');
+  });
+
+  it('preserves fileName when it has an ext but MIME suggests a different one', () => {
+    // Trust the user-supplied filename; it might be intentionally different.
+    expect(pickFileName({ fileName: 'thing.jpg', mimeType: 'image/png' }, 'data')).toBe('thing.jpg');
   });
 });
 
