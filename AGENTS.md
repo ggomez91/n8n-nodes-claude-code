@@ -1,4 +1,4 @@
-# AGENTS.md — `@ggomez91/n8n-nodes-claude-code`
+# AGENTS.md — `@ggomez91npm/n8n-nodes-claude-code`
 
 Reference for AI agents (Cursor, Claude Code, etc.) doing migrations or
 authoring workflows that use this n8n community node. Self-contained:
@@ -25,7 +25,7 @@ and you want per-token billing, use the SDK-based community node
 (`n8n-nodes-claude` unscoped, by `emu2025`) or the official Anthropic
 nodes — different beasts.
 
-**Internal node type identifier**: `@ggomez91/n8n-nodes-claude-code.claude`.
+**Internal node type identifier**: `@ggomez91npm/n8n-nodes-claude-code.claude`.
 **UI display name**: `Claude Code`.
 
 ---

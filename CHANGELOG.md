@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-04-26
+
+### Changed
+
+- **npm scope renamed** from `@ggomez91` to `@ggomez91npm` to match the
+  npm username actually registered. The unscoped package is unchanged
+  in behavior; only the install name differs:
+    Old: `@ggomez91/n8n-nodes-claude-code`
+    New: `@ggomez91npm/n8n-nodes-claude-code`
+- GitHub repo (`ggomez91/n8n-nodes-claude-code`) is unchanged.
+
+### Migration (for cortex / any host on 0.7.0–0.7.1)
+
+```sh
+cd /.n8n/nodes
+npm uninstall @ggomez91/n8n-nodes-claude-code
+npm install --omit=peer --omit=optional --omit=dev <new tarball or npm name>
+sqlite3 /.n8n/database.sqlite "
+  UPDATE installed_packages SET packageName='@ggomez91npm/n8n-nodes-claude-code' WHERE packageName='@ggomez91/n8n-nodes-claude-code';
+  UPDATE installed_nodes SET package='@ggomez91npm/n8n-nodes-claude-code', type='@ggomez91npm/n8n-nodes-claude-code.claude' WHERE package='@ggomez91/n8n-nodes-claude-code';
+  UPDATE workflow_entity SET nodes = REPLACE(nodes, '@ggomez91/n8n-nodes-claude-code.claude', '@ggomez91npm/n8n-nodes-claude-code.claude') WHERE nodes LIKE '%@ggomez91/n8n-nodes-claude-code.claude%';
+"
+systemctl restart n8n
+```
+
+`task deploy:cortex` does the npm + DB part automatically; the
+workflow_entity rewrite is a one-shot if you have existing workflows
+referencing the old type string.
+
 ## [0.7.1] — 2026-04-26
 
 ### Fixed

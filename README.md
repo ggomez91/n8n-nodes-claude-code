@@ -1,7 +1,7 @@
 # n8n-nodes-claude-code
 
-[![npm version](https://img.shields.io/npm/v/@ggomez91/n8n-nodes-claude-code.svg)](https://www.npmjs.com/package/@ggomez91/n8n-nodes-claude-code)
-[![license](https://img.shields.io/npm/l/@ggomez91/n8n-nodes-claude-code.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@ggomez91npm/n8n-nodes-claude-code.svg)](https://www.npmjs.com/package/@ggomez91npm/n8n-nodes-claude-code)
+[![license](https://img.shields.io/npm/l/@ggomez91npm/n8n-nodes-claude-code.svg)](LICENSE)
 
 **Use Claude in n8n with your existing Claude Pro/Max subscription. No API key, no per-token billing.**
 
@@ -43,7 +43,7 @@ The CLI auth (`~/.claude/.credentials.json`) is per-user. Make sure the user acc
 ### From the n8n UI (recommended)
 
 1. n8n → **Settings** → **Community Nodes** → **Install**
-2. Enter package name: `@ggomez91/n8n-nodes-claude-code`
+2. Enter package name: `@ggomez91npm/n8n-nodes-claude-code`
 3. Click Install. n8n restarts automatically.
 4. The **Claude Code** node appears in the node panel under the AI category.
 
@@ -51,7 +51,7 @@ The CLI auth (`~/.claude/.credentials.json`) is per-user. Make sure the user acc
 
 ```sh
 cd ~/.n8n/nodes      # or wherever your n8n nodes dir lives
-npm install @ggomez91/n8n-nodes-claude-code
+npm install @ggomez91npm/n8n-nodes-claude-code
 # restart n8n
 ```
 

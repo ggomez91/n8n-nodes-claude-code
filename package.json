@@ -1,6 +1,6 @@
 {
-  "name": "@ggomez91/n8n-nodes-claude-code",
-  "version": "0.7.1",
+  "name": "@ggomez91npm/n8n-nodes-claude-code",
+  "version": "0.7.2",
   "description": "Use Claude Code in n8n with your existing Claude Pro/Max subscription. Invokes the local Claude Code CLI as a subprocess and returns structured JSON. No API key, no per-token billing.",
   "license": "MIT",
   "homepage": "https://github.com/ggomez91/n8n-nodes-claude-code#readme",

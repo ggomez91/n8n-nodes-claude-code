@@ -4,7 +4,7 @@ vars:
   CORTEX_HOST: cortex
   CORTEX_TARBALL_DIR: /var/lib/n8n-claude-code
   CORTEX_NODES_DIR: /.n8n/nodes
-  PKG_NAME: '@ggomez91/n8n-nodes-claude-code'
+  PKG_NAME: '@ggomez91npm/n8n-nodes-claude-code'
 
 tasks:
   default:
