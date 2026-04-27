@@ -20,7 +20,9 @@
   },
   "main": "dist/nodes/Claude/Claude.node.js",
   "files": [
-    "dist"
+    "dist",
+    "AGENTS.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc && gulp build:icons",
@@ -28,7 +30,8 @@
     "format": "prettier --write \"nodes/**/*.ts\" \"test/**/*.ts\"",
     "test": "jest",
     "test:unit": "jest --selectProjects unit",
-    "test:integration": "jest --selectProjects integration"
+    "test:integration": "jest --selectProjects integration",
+    "prepublishOnly": "npm run lint && npm test && npm run build"
   },
   "keywords": [
     "n8n-community-node-package",

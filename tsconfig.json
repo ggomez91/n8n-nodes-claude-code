@@ -17,6 +17,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["nodes/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist", "test/fixtures/**"]
+  "include": ["nodes/**/*"],
+  "exclude": ["node_modules", "dist", "test/**/*"]
 }
