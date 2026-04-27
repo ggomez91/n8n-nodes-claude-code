@@ -1,0 +1,117 @@
+version: '3'
+
+vars:
+  CORTEX_HOST: cortex
+  CORTEX_TARBALL_DIR: /var/lib/n8n-claude-code
+  CORTEX_NODES_DIR: /.n8n/nodes
+  PKG_NAME: '@ggomez91/n8n-nodes-claude-code'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install npm dependencies
+    cmds:
+      - npm install
+    sources:
+      - package.json
+      - package-lock.json
+    generates:
+      - node_modules/**
+
+  lint:
+    desc: Run ESLint (incl. n8n verified-publisher rules)
+    cmds:
+      - npm run lint
+
+  test:
+    desc: Run all tests (unit + integration)
+    cmds:
+      - npx jest --no-coverage
+
+  test:unit:
+    desc: Run only unit tests
+    cmds:
+      - npx jest --no-coverage --selectProjects unit
+
+  test:integration:
+    desc: Run only integration tests (against shell-script CLI stubs)
+    cmds:
+      - npx jest --no-coverage --selectProjects integration
+
+  build:
+    desc: Compile TS and copy node icons to dist/
+    deps: [install]
+    cmds:
+      - npm run build
+    sources:
+      - nodes/**/*.ts
+      - nodes/**/*.svg
+      - tsconfig.json
+    generates:
+      - dist/**
+
+  pack:
+    desc: Build and produce a tarball ready to install
+    deps: [build]
+    cmds:
+      - rm -f *.tgz
+      - npm pack
+    generates:
+      - '*.tgz'
+
+  check:
+    desc: Run lint + tests (fast pre-deploy gate)
+    cmds:
+      - task: lint
+      - task: test
+
+  deploy:cortex:
+    desc: Build, pack, scp to cortex, install, restart n8n. Idempotent.
+    deps: [check, pack]
+    vars:
+      VERSION:
+        sh: node -p "require('./package.json').version"
+      TARBALL: ggomez91-n8n-nodes-claude-code-{{.VERSION}}.tgz
+    cmds:
+      - echo "Deploying {{.PKG_NAME}}@{{.VERSION}} to {{.CORTEX_HOST}}…"
+      - scp {{.TARBALL}} {{.CORTEX_HOST}}:{{.CORTEX_TARBALL_DIR}}/
+      - |
+        ssh {{.CORTEX_HOST}} 'set -e
+          # Update /.n8n/nodes/package.json to point at the new tarball.
+          # Then npm install + bump installed_packages row + restart n8n.
+          cd {{.CORTEX_NODES_DIR}}
+          node -e "
+            const fs = require(\"fs\");
+            const p = JSON.parse(fs.readFileSync(\"package.json\", \"utf8\"));
+            p.dependencies[\"{{.PKG_NAME}}\"] = \"file:{{.CORTEX_TARBALL_DIR}}/{{.TARBALL}}\";
+            fs.writeFileSync(\"package.json\", JSON.stringify(p, null, 2) + \"\n\");
+          "
+          npm install --omit=peer --omit=optional --omit=dev {{.CORTEX_TARBALL_DIR}}/{{.TARBALL}} 2>&1 | tail -3
+          sqlite3 /.n8n/database.sqlite "UPDATE installed_packages SET installedVersion=\"{{.VERSION}}\", updatedAt=STRFTIME(\"%Y-%m-%d %H:%M:%f\", \"NOW\") WHERE packageName=\"{{.PKG_NAME}}\";"
+          systemctl restart n8n
+        '
+      - sleep 6
+      - ssh {{.CORTEX_HOST}} 'journalctl -u n8n --since "10 seconds ago" --no-pager | grep -iE "missing|error|claude" | head -5 || echo "(no errors in log window)"'
+      - echo "✓ Deployed {{.PKG_NAME}}@{{.VERSION}} to {{.CORTEX_HOST}}"
+
+  status:cortex:
+    desc: Show what's installed on cortex
+    cmds:
+      - |
+        ssh {{.CORTEX_HOST}} 'echo "--- DB ---"
+          sqlite3 /.n8n/database.sqlite "SELECT packageName, installedVersion, updatedAt FROM installed_packages WHERE packageName LIKE \"%claude%\";"
+          echo "--- Filesystem ---"
+          ls -lh {{.CORTEX_TARBALL_DIR}}/ 2>&1
+          echo "--- Service ---"
+          systemctl is-active n8n
+        '
+
+  clean:
+    desc: Remove build artifacts (dist/, *.tgz)
+    cmds:
+      - rm -rf dist
+      - rm -f *.tgz
