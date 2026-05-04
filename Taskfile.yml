@@ -75,7 +75,7 @@ tasks:
     vars:
       VERSION:
         sh: node -p "require('./package.json').version"
-      TARBALL: ggomez91-n8n-nodes-claude-code-{{.VERSION}}.tgz
+      TARBALL: ggomez91npm-n8n-nodes-claude-code-{{.VERSION}}.tgz
     cmds:
       - echo "Deploying {{.PKG_NAME}}@{{.VERSION}} to {{.CORTEX_HOST}}…"
       - scp {{.TARBALL}} {{.CORTEX_HOST}}:{{.CORTEX_TARBALL_DIR}}/
