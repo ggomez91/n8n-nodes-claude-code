@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-05-03
+
+### Fixed
+
+- **JSON Mode parser** now extracts JSON wrapped in prose. Previously
+  `stripFences` required the entire response to be a single fenced
+  block; outputs like `` ```json\n{...}\n```\n\nNote: ... `` (Claude
+  often appends a trailing note when something partially failed) fell
+  through and broke `JSON.parse`. The fence regex is no longer anchored
+  to start/end of the string.
+- Added an unfenced-prose fallback (`sliceJsonSpan`): if fence-stripped
+  parse fails, slice from the first `{`/`[` to the last matching
+  `}`/`]` and retry. No brace counting — if the slice is invalid JSON,
+  the original parse error is returned (loud failure, not silent
+  corruption).
+
 ## [0.7.2] — 2026-04-26
 
 ### Changed
