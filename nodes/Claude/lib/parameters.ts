@@ -103,6 +103,15 @@ export const nodeProperties: INodeProperties[] = [
           'Name of the Claude CLI binary to spawn. Resolved against PATH unless an absolute path is given. Override only if your binary is renamed or wrapped.',
       },
       {
+        displayName: 'Resume Session ID',
+        name: 'resumeSessionId',
+        type: 'string',
+        default: '',
+        placeholder: 'e.g. {{ $json.sessionId }} from a previous Claude Code call',
+        description:
+          "Continue a previous Claude Code conversation instead of starting fresh: passes --resume with this ID to the CLI. Every call returns its sessionId on the output item — store it and feed it back here for multi-turn memory. The session lives on the machine running n8n, tied to the CLI's working directory and user. Caching is bypassed when resuming (stateful calls must never return stale turns).",
+      },
+      {
         displayName: 'Retries on Parse Failure',
         name: 'retries',
         type: 'number',
@@ -118,6 +127,7 @@ export const nodeProperties: INodeProperties[] = [
 
 const SAFE_BINARY_NAME = /^[A-Za-z0-9._/\\:-]+$/;
 const SAFE_MODEL_NAME = /^[A-Za-z0-9._-]+$/;
+const SAFE_SESSION_ID = /^[A-Za-z0-9-]{8,64}$/;
 
 export interface RawInput {
   prompt: unknown;
@@ -125,6 +135,7 @@ export interface RawInput {
   cliBinaryName: unknown;
   model?: unknown;
   systemPrompt?: unknown;
+  resumeSessionId?: unknown;
   itemIndex: number;
 }
 
@@ -181,7 +192,28 @@ export function validateAndNormalize(raw: RawInput): NodeInputItem {
     systemPrompt = raw.systemPrompt;
   }
 
-  return { prompt, timeoutSeconds, cliBinaryName, model, systemPrompt, itemIndex: raw.itemIndex };
+  let resumeSessionId: string | undefined;
+  if (typeof raw.resumeSessionId === 'string' && raw.resumeSessionId.trim().length > 0) {
+    const trimmed = raw.resumeSessionId.trim();
+    if (!SAFE_SESSION_ID.test(trimmed)) {
+      throw new ValidationFailure(
+        'resumeSessionId',
+        raw.resumeSessionId,
+        'resumeSessionId contains disallowed characters (expected a CLI session ID)',
+      );
+    }
+    resumeSessionId = trimmed;
+  }
+
+  return {
+    prompt,
+    timeoutSeconds,
+    cliBinaryName,
+    model,
+    systemPrompt,
+    resumeSessionId,
+    itemIndex: raw.itemIndex,
+  };
 }
 
 function coercePromptToString(value: unknown): string | null {

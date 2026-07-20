@@ -61,3 +61,25 @@ describe('output.parser.parseCliOutput', () => {
     expect(() => parseCliOutput(buf(JSON.stringify({ misc: true })), 0)).toThrow(ParseFailure);
   });
 });
+
+describe('output.parser.parseCliOutput — sessionId', () => {
+  it('surfaces session_id from the envelope as sessionId', () => {
+    const stdout = buf(
+      JSON.stringify({ result: 'ok', session_id: '8f14e45f-ceea-4670-a134-6d1f0a7b26fd' }),
+    );
+    const out = parseCliOutput(stdout, 10);
+    expect(out.sessionId).toBe('8f14e45f-ceea-4670-a134-6d1f0a7b26fd');
+  });
+
+  it('accepts camelCase sessionId as a fallback', () => {
+    const stdout = buf(JSON.stringify({ result: 'ok', sessionId: 'abc-123-def-456' }));
+    const out = parseCliOutput(stdout, 10);
+    expect(out.sessionId).toBe('abc-123-def-456');
+  });
+
+  it('omits sessionId when the envelope has none', () => {
+    const stdout = buf(JSON.stringify({ result: 'ok' }));
+    const out = parseCliOutput(stdout, 10);
+    expect(out.sessionId).toBeUndefined();
+  });
+});

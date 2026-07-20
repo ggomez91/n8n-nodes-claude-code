@@ -48,6 +48,8 @@ export function parseCliOutput(stdout: Buffer, elapsedMs: number): NodeOutputIte
   };
 
   if (typeof obj.model === 'string') out.model = obj.model;
+  const sid = obj.session_id ?? obj.sessionId;
+  if (typeof sid === 'string' && sid.length > 0) out.sessionId = sid;
   const stop = obj.stop_reason ?? obj.stopReason;
   if (typeof stop === 'string') out.stopReason = stop;
 

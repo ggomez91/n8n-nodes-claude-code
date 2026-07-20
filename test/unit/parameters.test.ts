@@ -97,3 +97,40 @@ describe('parameters.validateAndNormalize', () => {
     expect(validateAndNormalize({ ...base, systemPrompt: evil }).systemPrompt).toBe(evil);
   });
 });
+
+describe('parameters.validateAndNormalize — resumeSessionId', () => {
+  const base = { prompt: 'hello', timeoutSeconds: 120, cliBinaryName: 'claude', itemIndex: 0 };
+
+  it('passes through a valid session ID', () => {
+    const out = validateAndNormalize({
+      ...base,
+      resumeSessionId: '8f14e45f-ceea-4670-a134-6d1f0a7b26fd',
+    });
+    expect(out.resumeSessionId).toBe('8f14e45f-ceea-4670-a134-6d1f0a7b26fd');
+  });
+
+  it('omits resumeSessionId when empty/undefined/whitespace', () => {
+    expect(validateAndNormalize(base).resumeSessionId).toBeUndefined();
+    expect(validateAndNormalize({ ...base, resumeSessionId: '' }).resumeSessionId).toBeUndefined();
+    expect(
+      validateAndNormalize({ ...base, resumeSessionId: '   ' }).resumeSessionId,
+    ).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace from a valid session ID', () => {
+    const out = validateAndNormalize({ ...base, resumeSessionId: '  abcd-1234-efgh  ' });
+    expect(out.resumeSessionId).toBe('abcd-1234-efgh');
+  });
+
+  it('rejects a session ID with disallowed characters', () => {
+    expect(() =>
+      validateAndNormalize({ ...base, resumeSessionId: 'abc; rm -rf /' }),
+    ).toThrow(/resumeSessionId/i);
+  });
+
+  it('rejects a session ID that is too short', () => {
+    expect(() => validateAndNormalize({ ...base, resumeSessionId: 'ab12' })).toThrow(
+      /resumeSessionId/i,
+    );
+  });
+});

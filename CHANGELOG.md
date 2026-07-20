@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-20
+
+### Added
+- **Session resume**: new option `resumeSessionId` passes `--resume <ID>` to the CLI to
+  continue a previous conversation. Every output item now carries `sessionId` (from the
+  CLI envelope, also as camelCase fallback) so workflows can store it and feed it back.
+- Validation for `resumeSessionId` (`[A-Za-z0-9-]{8,64}`), with a `validation` error
+  category on bad input.
+
+### Changed
+- Response caching is bypassed when resuming a session — stateful calls must never return
+  a cached earlier turn.
+
 ## [0.7.3] — 2026-05-03
 
 ### Fixed

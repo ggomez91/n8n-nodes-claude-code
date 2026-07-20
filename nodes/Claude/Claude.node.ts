@@ -95,10 +95,15 @@ async function runForItem(
     useCache?: boolean;
     cacheTtlSeconds?: number;
     cacheDir?: string;
+    resumeSessionId?: string;
   };
   const cliBinaryName = optionsParam.cliBinaryName ?? 'claude';
   const retries = responseFormat === 'json' ? Math.max(0, optionsParam.retries ?? 0) : 0;
-  const useCache = optionsParam.useCache === true;
+  const resuming =
+    typeof optionsParam.resumeSessionId === 'string' &&
+    optionsParam.resumeSessionId.trim().length > 0;
+  // Resumed calls are stateful: identical inputs produce different turns, so caching is unsound.
+  const useCache = optionsParam.useCache === true && !resuming;
   const cacheTtlSeconds = Math.max(0, optionsParam.cacheTtlSeconds ?? 0);
   const cacheDir = optionsParam.cacheDir?.trim() || DEFAULT_CACHE_DIR;
 
@@ -110,6 +115,7 @@ async function runForItem(
       cliBinaryName,
       model,
       systemPrompt,
+      resumeSessionId: optionsParam.resumeSessionId,
       itemIndex: i,
     });
   } catch (err) {

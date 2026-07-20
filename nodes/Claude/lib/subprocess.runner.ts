@@ -19,6 +19,7 @@ export async function runCli(
   if (input.model) args.push('--model', input.model);
   if (opts.attachmentsDir) args.push('--add-dir', opts.attachmentsDir);
   if (input.systemPrompt) args.push('--append-system-prompt', input.systemPrompt);
+  if (input.resumeSessionId) args.push('--resume', input.resumeSessionId);
   args.push(input.prompt);
 
   return new Promise((resolve) => {

@@ -18,6 +18,8 @@ export interface NodeInputItem {
   cliBinaryName: string;
   model?: string;
   systemPrompt?: string;
+  /** Claude Code session ID to resume (--resume). The CLI continues that conversation. */
+  resumeSessionId?: string;
   itemIndex: number;
   /**
    * Resolved binary attachments. Each entry is a buffer + a sanitized
@@ -51,6 +53,8 @@ export interface NodeOutputItem {
   success: true;
   response: string;
   json?: JsonOutcome;
+  /** Session ID reported by the CLI envelope; pass back as resumeSessionId for multi-turn. */
+  sessionId?: string;
   model?: string;
   stopReason?: string;
   usage?: {

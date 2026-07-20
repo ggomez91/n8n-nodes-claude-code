@@ -252,7 +252,7 @@ This node is **not** an AI Agent / chat-model provider in n8n's LangChain ecosys
 ## Limitations / gotchas
 
 - **No streaming**: synchronous one-shot only. Whole response arrives at once.
-- **No multi-turn / conversation history**: every call is a fresh invocation; the CLI's `--continue` / `--resume` flags are not exposed yet.
+- **Multi-turn via sessions (v0.8.0+)**: each call returns `sessionId`; pass it back via `options.resumeSessionId` to continue that conversation (`--resume`). Sessions live on the n8n host (per OS user + process cwd). Caching is bypassed while resuming. `--continue` (implicit last-session) is intentionally not exposed — always address a session by ID.
 - **No tool restriction**: Claude Code may use Read, Bash, etc. as it deems useful (subject to its own permission model). The node exposes `--add-dir` for binary attachments but no `--allowed-tools` / `--disallowed-tools` parameters.
 - **No `temperature` / `top_p` / `max_tokens` knobs**: the Claude Code CLI doesn't expose these in `--print` mode.
 - **Subscription rate limits apply**: you're using Pro/Max quota. Heavy batch workflows can hit the wall. Cache aggressively on idempotent prompts.

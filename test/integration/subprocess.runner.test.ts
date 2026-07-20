@@ -149,3 +149,32 @@ describe('subprocess.runner — timeout & cancellation (US3)', () => {
     expect(elapsed).toBeLessThan(6_000);
   });
 });
+
+describe('subprocess.runner — resume flag', () => {
+  it('includes --resume <value> in argv when resumeSessionId is set', async () => {
+    const result = await runCli(
+      input({
+        cliBinaryName: path.join(FIXTURES, 'claude-stub-echoargs.sh'),
+        prompt: 'hi',
+        resumeSessionId: '8f14e45f-ceea-4670-a134-6d1f0a7b26fd',
+      }),
+    );
+    const obj = JSON.parse(result.stdout.toString('utf8'));
+    expect(obj.args).toEqual([
+      '-p',
+      '--output-format',
+      'json',
+      '--resume',
+      '8f14e45f-ceea-4670-a134-6d1f0a7b26fd',
+      'hi',
+    ]);
+  });
+
+  it('does not include --resume when resumeSessionId is undefined', async () => {
+    const result = await runCli(
+      input({ cliBinaryName: path.join(FIXTURES, 'claude-stub-echoargs.sh'), prompt: 'hi' }),
+    );
+    const obj = JSON.parse(result.stdout.toString('utf8'));
+    expect(obj.args).toEqual(['-p', '--output-format', 'json', 'hi']);
+  });
+});

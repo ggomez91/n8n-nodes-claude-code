@@ -142,11 +142,25 @@ Full output schemas, error categories, migration recipes, and gotchas: see [**AG
 
 ---
 
+## Multi-turn conversations (sessions)
+
+Every call returns a `sessionId` on the output item (from the CLI envelope). To continue that
+conversation in a later call, pass it back via **Options → Resume Session ID** — the node runs
+`claude --resume <ID>` and Claude remembers the whole prior exchange. Sessions live on the
+machine that runs n8n (per OS user + working directory of the n8n process), so they survive
+n8n restarts. Caching is automatically bypassed on resumed calls.
+
+```text
+Turn 1: Claude Code node → output { response, sessionId: "8f14…" }
+Turn 2: Options → Resume Session ID = {{ $json.sessionId }} → Claude continues the conversation
+```
+
+---
+
 ## When NOT to use this node
 
 - You want **per-token API billing** (use [`n8n-nodes-claude`](https://www.npmjs.com/package/n8n-nodes-claude) or the official Anthropic node).
 - You need **streaming** responses (this node is synchronous one-shot).
-- You need **multi-turn / conversation history** with Claude (no `--continue` / `--resume` exposed).
 - You need **temperature / top_p / max_tokens** control (Claude Code CLI doesn't expose them).
 - You need a **chat-model provider for n8n's AI Agent** (this is an action node, not a langchain chat model).
 
